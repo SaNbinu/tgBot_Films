@@ -1,6 +1,6 @@
 import os
 import requests
-from typing import Any
+from typing import Any, Literal
 from requests.exceptions import RequestException
 
 
@@ -124,3 +124,135 @@ class TMDBClient:
             "imdb_id": data.get("imdb_id"),
             "production_companies": data.get("production_companies", []),
         }
+
+    def search_person(self, name: str) -> dict | None:
+        """Search for a person (actor, director, etc.) by name.
+
+        Args:
+            name: Person name to search for.
+
+        Returns:
+            A dict with person data if found, or None if no results.
+        """
+        data = self._get("/search/person", {"query": name})
+        if not data:
+            return None
+        results = data.get("results")
+        if not results:
+            return None
+        first = results[0]
+        return {
+            "id": first["id"],
+            "name": first["name"],
+            "known_for_department": first.get("known_for_department"),
+            "popularity": first.get("popularity"),
+            "profile_path": first.get("profile_path"),
+            "known_for": first.get("known_for", []),
+        }
+
+    def get_person_movies(self, person_id: int, role: Literal["actor", "director"] = "actor") -> list[dict]:
+        """Get movies a person has participated in.
+
+        Args:
+            person_id: TMDB person ID.
+            role: "actor" for cast roles, "director" for directed films.
+
+        Returns:
+            A list of movies with id, title, character/job, release_date,
+            vote_average, poster_path.
+        """
+        data = self._get(f"/person/{person_id}/movie_credits")
+        if not data:
+            return []
+
+        if role == "actor":
+            cast = data.get("cast", [])
+            return [
+                {
+                    "id": m["id"],
+                    "title": m["title"],
+                    "character": m.get("character"),
+                    "release_date": m.get("release_date"),
+                    "vote_average": m.get("vote_average"),
+                    "poster_path": m.get("poster_path"),
+                }
+                for m in cast
+            ]
+
+        crew = data.get("crew", [])
+        directed = [m for m in crew if m.get("job") == "Director"]
+        return [
+            {
+                "id": m["id"],
+                "title": m["title"],
+                "job": m.get("job"),
+                "release_date": m.get("release_date"),
+                "vote_average": m.get("vote_average"),
+                "poster_path": m.get("poster_path"),
+            }
+            for m in directed
+        ]
+
+    def get_genres(self) -> list[dict]:
+        """Get a list of all TMDB movie genres.
+
+        Returns:
+            A list of genres, each with id and name.
+        """
+        data = self._get("/genre/movie/list")
+        if not data:
+            return []
+        return data.get("genres", [])
+
+    def discover_movies(
+        self,
+        with_genres: str | None = None,
+        primary_release_year: int | None = None,
+        vote_average_gte: float | None = None,
+        sort_by: str | None = None,
+        with_original_language: str | None = None,
+        page: int = 1,
+    ) -> list[dict]:
+        """Discover movies using TMDB /discover/movie endpoint.
+
+        Args:
+            with_genres: Comma-separated genre IDs to filter by.
+            primary_release_year: Filter by primary release year.
+            vote_average_gte: Minimum vote average.
+            sort_by: Sort option (e.g. "popularity.desc", "vote_average.desc").
+            with_original_language: Filter by original language code (e.g. "en", "fr").
+            page: Page number (default 1).
+
+        Returns:
+            A list of discovered movies with id, title, overview,
+            release_date, vote_average, poster_path, genre_ids.
+        """
+        params: dict[str, Any] = {"page": page}
+        if with_genres:
+            params["with_genres"] = with_genres
+        if primary_release_year:
+            params["primary_release_year"] = primary_release_year
+        if vote_average_gte is not None:
+            params["vote_average.gte"] = vote_average_gte
+        if sort_by:
+            params["sort_by"] = sort_by
+        if with_original_language:
+            params["with_original_language"] = with_original_language
+
+        data = self._get("/discover/movie", params)
+        if not data:
+            return []
+        results = data.get("results", [])
+        return [
+            {
+                "id": m["id"],
+                "title": m["title"],
+                "overview": m.get("overview"),
+                "release_date": m.get("release_date"),
+                "vote_average": m.get("vote_average"),
+                "poster_path": m.get("poster_path"),
+                "genre_ids": m.get("genre_ids", []),
+            }
+            for m in results
+        ]
+
