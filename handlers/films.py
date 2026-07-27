@@ -1,8 +1,21 @@
 from bot import bot
 from keyboards.menus import films_menu, watched_menu, wanted_menu
-from services.openai_service import generate_recommendation
 from services.db import add_film, get_films
+from services.query_analyzer import QueryAnalyzer
+from services.tmdb_service import TMDBClient
+from services.ollama_service import OllamaService
+from services.recommendation_service import RecommendationService
 from datetime import datetime
+
+analyzer = QueryAnalyzer()
+tmdb = TMDBClient()
+ollama = OllamaService()
+
+recommendation_service = RecommendationService(
+    analyzer,
+    tmdb,
+    ollama,
+)
 
 #user_state = {}
 state = {}
@@ -116,8 +129,13 @@ def handler(message):
         msg = bot.send_message(message.chat.id, "What do you want?")
         bot.register_next_step_handler(
             msg,
-            lambda m: bot.send_message(
-                m.chat.id,
-                generate_recommendation(m.text)
-            )
+            lambda m: _handle_recommend(m)
         )
+
+
+def _handle_recommend(m):
+    print("START recommendation")
+    result = recommendation_service.recommend(m.text)
+    print("Recommendation ready")
+    bot.send_message(m.chat.id, result.message)
+    print("Message sent")

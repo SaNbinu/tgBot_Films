@@ -92,6 +92,48 @@ class TMDBClient:
             for m in results[:limit]
         ]
 
+    def get_recommendations(self, movie_id: int, limit: int = 20) -> list[dict]:
+        """Get movie recommendations from /movie/{id}/recommendations.
+
+        Args:
+            movie_id: TMDB movie ID.
+            limit: Maximum number of results to return (default 20).
+
+        Returns:
+            A list of recommended movies with id, title, overview,
+            release_date, vote_average, poster_path, genre_ids.
+        """
+        data = self._get(f"/movie/{movie_id}/recommendations")
+        if not data:
+            return []
+        results = data.get("results", [])
+        return [
+            {
+                "id": m["id"],
+                "title": m["title"],
+                "overview": m.get("overview"),
+                "release_date": m.get("release_date"),
+                "vote_average": m.get("vote_average"),
+                "poster_path": m.get("poster_path"),
+                "genre_ids": m.get("genre_ids", []),
+            }
+            for m in results[:limit]
+        ]
+
+    def get_movie_keywords(self, movie_id: int) -> list[str]:
+        """Get keywords for a movie from /movie/{id}/keywords.
+
+        Args:
+            movie_id: TMDB movie ID.
+
+        Returns:
+            A list of keyword strings, or an empty list if none found.
+        """
+        data = self._get(f"/movie/{movie_id}/keywords")
+        if not data:
+            return []
+        return [kw["name"] for kw in data.get("keywords", [])]
+
     def get_movie_details(self, movie_id: int) -> dict | None:
         """Get full details for a movie by its TMDB ID.
 
@@ -125,16 +167,20 @@ class TMDBClient:
             "production_companies": data.get("production_companies", []),
         }
 
-    def search_person(self, name: str) -> dict | None:
+    def search_person(self, name: str, language: str | None = None) -> dict | None:
         """Search for a person (actor, director, etc.) by name.
 
         Args:
             name: Person name to search for.
+            language: Language override (e.g. "en-US"). Uses instance default if None.
 
         Returns:
             A dict with person data if found, or None if no results.
         """
-        data = self._get("/search/person", {"query": name})
+        params: dict[str, Any] = {"query": name}
+        if language is not None:
+            params["language"] = language
+        data = self._get("/search/person", params)
         if not data:
             return None
         results = data.get("results")
@@ -174,6 +220,8 @@ class TMDBClient:
                     "character": m.get("character"),
                     "release_date": m.get("release_date"),
                     "vote_average": m.get("vote_average"),
+                    "vote_count": m.get("vote_count"),
+                    "overview": m.get("overview"),
                     "poster_path": m.get("poster_path"),
                 }
                 for m in cast
@@ -188,6 +236,8 @@ class TMDBClient:
                 "job": m.get("job"),
                 "release_date": m.get("release_date"),
                 "vote_average": m.get("vote_average"),
+                "vote_count": m.get("vote_count"),
+                "overview": m.get("overview"),
                 "poster_path": m.get("poster_path"),
             }
             for m in directed
@@ -225,7 +275,7 @@ class TMDBClient:
 
         Returns:
             A list of discovered movies with id, title, overview,
-            release_date, vote_average, poster_path, genre_ids.
+            release_date, vote_average, vote_count, poster_path, genre_ids.
         """
         params: dict[str, Any] = {"page": page}
         if with_genres:
@@ -250,6 +300,7 @@ class TMDBClient:
                 "overview": m.get("overview"),
                 "release_date": m.get("release_date"),
                 "vote_average": m.get("vote_average"),
+                "vote_count": m.get("vote_count"),
                 "poster_path": m.get("poster_path"),
                 "genre_ids": m.get("genre_ids", []),
             }
