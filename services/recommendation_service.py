@@ -64,6 +64,7 @@ class RecommendationService:
         t0 = time.perf_counter()
         result: AnalysisResult = self.analyzer.analyze(user_query)
         print(f"QueryAnalyzer: {time.perf_counter() - t0:.3f} sec")
+        print(f"  query_type={result.query_type}, value={result.value!r}")
 
         if result.query_type == QueryType.SIMILAR_MOVIE:
             res = self._handle_similar_movie(user_query, result.value)
@@ -80,6 +81,10 @@ class RecommendationService:
 
     def _handle_similar_movie(self, user_query: str, movie_title: str | None) -> RecommendationResult:
         """Find top 3 similar movies using TMDB data + custom MovieScorer."""
+        print(f"=== SIMILAR_MOVIE DEBUG ===")
+        print(f"user_query = {user_query!r}")
+        print(f"movie_title = {movie_title!r}")
+
         if not movie_title:
             return RecommendationResult(
                 success=False,
@@ -88,9 +93,25 @@ class RecommendationService:
             )
 
         t0 = time.perf_counter()
+        print(f"Calling search_movie with: {movie_title!r}")
         movie = self.tmdb.search_movie(movie_title)
         print(f"search_movie: {time.perf_counter() - t0:.3f} sec")
+        print(f"search_movie result: {movie.get('title', 'N/A') if movie else None}")
         if not movie:
+            print("  -> search_movie returned None. Trying Ollama normalization.")
+            try:
+                normalized = self.ollama.normalize_movie_title(movie_title)
+            except Exception as e:
+                print(f"  -> Ollama normalization failed: {e}")
+                normalized = ""
+            if normalized:
+                print(f"  -> Normalized title: {normalized!r}")
+                t0 = time.perf_counter()
+                movie = self.tmdb.search_movie(normalized)
+                print(f"  -> Retry search_movie: {time.perf_counter() - t0:.3f} sec")
+                print(f"  -> Retry result: {movie.get('title', 'N/A') if movie else None}")
+        if not movie:
+            print("  -> Movie not found by TMDB after normalization.")
             return RecommendationResult(
                 success=False,
                 message="Фильм не найден.",
@@ -102,7 +123,7 @@ class RecommendationService:
         raw_candidates: list[dict] = []
 
         t0 = time.perf_counter()
-        for r in self.tmdb.get_recommendations(source_id, limit=20):
+        for r in self.tmdb.get_recommendations(source_id, limit=10):
             if r["id"] != source_id and r["id"] not in seen_ids:
                 r["_source"] = "recommendation"
                 raw_candidates.append(r)
@@ -110,7 +131,7 @@ class RecommendationService:
         print(f"get_recommendations: {time.perf_counter() - t0:.3f} sec")
 
         t0 = time.perf_counter()
-        for s in self.tmdb.get_similar_movies(source_id, limit=20):
+        for s in self.tmdb.get_similar_movies(source_id, limit=10):
             if s["id"] != source_id and s["id"] not in seen_ids:
                 s["_source"] = "similar"
                 raw_candidates.append(s)
@@ -127,20 +148,24 @@ class RecommendationService:
                 movies=[],
             )
 
-        genre_ids = [str(g["id"]) for g in details.get("genres", [])]
-        genre_str = ",".join(genre_ids) if genre_ids else ""
-        if genre_str:
-            for d in self.tmdb.discover_movies(
-                with_genres=genre_str,
-                vote_average_gte=6.5,
-                sort_by="vote_count.desc",
-                page=1,
-            ):
-                if d["id"] != source_id and d["id"] not in seen_ids:
-                    d["_source"] = "discover"
-                    raw_candidates.append(d)
-                    seen_ids.add(d["id"])
-        print(f"discover_movies: {time.perf_counter() - t0:.3f} sec")
+        if len(raw_candidates) < 10:
+            genre_ids = [str(g["id"]) for g in details.get("genres", [])]
+            genre_str = ",".join(genre_ids) if genre_ids else ""
+            if genre_str:
+                t0 = time.perf_counter()
+                for d in self.tmdb.discover_movies(
+                    with_genres=genre_str,
+                    vote_average_gte=6.5,
+                    sort_by="vote_count.desc",
+                    page=1,
+                ):
+                    if d["id"] != source_id and d["id"] not in seen_ids:
+                        d["_source"] = "discover"
+                        raw_candidates.append(d)
+                        seen_ids.add(d["id"])
+                print(f"discover_movies: {time.perf_counter() - t0:.3f} sec")
+        else:
+            print("discover_movies: SKIPPED (recommendations + similar >= 10)")
 
         recs = [c for c in raw_candidates if c.get("_source") == "recommendation"]
         sims = [c for c in raw_candidates if c.get("_source") == "similar"]
@@ -196,26 +221,74 @@ class RecommendationService:
         scored_sims = _score_and_sort(sims, "SIMILAR")
         scored_disc = _score_and_sort(disc, "DISCOVER")
 
+        all_scored = sorted(
+            scored_recs + scored_sims + scored_disc,
+            key=lambda x: x[0],
+            reverse=True,
+        )
+        top10_candidates = [c for _, _, c in all_scored[:10]]
+        print("=== TOP-10 CANDIDATES ===")
+        for i, c in enumerate(top10_candidates, 1):
+            print(f"  {i}. {c.get('title', '?')} (score={all_scored[i-1][0]:.2f}, _source={c.get('_source', '?')})")
+
+        ollama_titles: list[str] = []
+        try:
+            ollama_titles = self.ollama.rerank_movies(user_query, top10_candidates, source_movie=movie)
+        except Exception as e:
+            print(f"Ollama rerank failed: {e}")
+
+        title_to_movie: dict[str, dict] = {}
+        for c in raw_candidates:
+            title = (c.get("title") or "").strip()
+            if title:
+                title_to_movie[title.lower()] = c
+
         selected: list[dict] = []
         seen_ids: set[int] = set()
+        ollama_used = False
 
-        for _, _, c in scored_recs[:2]:
-            if c["id"] not in seen_ids:
-                selected.append(c)
-                seen_ids.add(c["id"])
+        print("=== OLLAMA TITLE MATCHING ===")
+        for t in ollama_titles:
+            t_clean = t.strip().lower()
+            match = title_to_movie.get(t_clean)
+            if match:
+                print(f"  MATCHED: '{t}' -> {match.get('title', '?')} (id={match['id']})")
+            else:
+                print(f"  NOT FOUND: '{t}' — no match in candidates")
+            if match and match["id"] not in seen_ids:
+                selected.append(match)
+                seen_ids.add(match["id"])
+                ollama_used = True
 
-        for _, _, c in scored_sims[:1]:
-            if c["id"] not in seen_ids:
-                selected.append(c)
-                seen_ids.add(c["id"])
+        if not ollama_used:
+            print("  -> Ollama returned 0 valid titles. Full fallback to MovieScorer.")
+        elif len(selected) < 3:
+            print(f"  -> Ollama returned only {len(selected)} valid title(s). Filling rest from MovieScorer.")
+        else:
+            print(f"  -> Ollama returned {len(selected)} valid titles. Using Ollama selection.")
 
-        if len(selected) < 3:
-            for _, _, c in scored_disc:
+        if not ollama_used or len(selected) < 3:
+            print("Ollama selection incomplete — falling back to MovieScorer ranking")
+            selected = []
+            seen_ids.clear()
+
+            for _, _, c in scored_recs[:2]:
                 if c["id"] not in seen_ids:
                     selected.append(c)
                     seen_ids.add(c["id"])
-                    if len(selected) >= 3:
-                        break
+
+            for _, _, c in scored_sims[:1]:
+                if c["id"] not in seen_ids:
+                    selected.append(c)
+                    seen_ids.add(c["id"])
+
+            if len(selected) < 3:
+                for _, _, c in scored_disc:
+                    if c["id"] not in seen_ids:
+                        selected.append(c)
+                        seen_ids.add(c["id"])
+                        if len(selected) >= 3:
+                            break
 
         top3 = selected[:3]
 
@@ -481,9 +554,17 @@ class RecommendationService:
 
     def _handle_ai_required(self, user_query: str) -> RecommendationResult:
         """Handle a complex request that requires AI processing."""
+        try:
+            text = self.ollama.generate_response(user_query)
+        except Exception as e:
+            return RecommendationResult(
+                success=False,
+                message=f"Не удалось обработать запрос: {e}",
+                movies=[],
+            )
         return RecommendationResult(
-            success=False,
-            message="AI_REQUIRED — TODO",
+            success=True,
+            message=text.strip(),
             movies=[],
         )
 

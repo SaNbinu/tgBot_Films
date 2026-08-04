@@ -71,7 +71,18 @@ def process_add(message):
 
 @bot.message_handler(func=lambda m: True)
 def handler(message):
+    current = state.get(message.chat.id)
     text = message.text.lower()
+
+    # ---------------- FSM: ADD ----------------
+    if current in ("add_watched", "add_wanted"):
+        process_add(message)
+        return
+
+    # ---------------- FSM: RECOMMEND ----------------
+    if current == "recommend":
+        _handle_recommend(message)
+        return
 
     # ---------------- MAIN MENU ----------------
     if text == "films":
@@ -103,8 +114,6 @@ def handler(message):
 
     # ---------------- ADD ----------------
     elif text == "add":
-        current = state.get(message.chat.id)
-
         if current == "watched":
             state[message.chat.id] = "add_watched"
         elif current == "wanted":
@@ -112,8 +121,7 @@ def handler(message):
         else:
             state[message.chat.id] = "add_watched"
 
-        msg = bot.send_message(message.chat.id, "Enter film name")
-        bot.register_next_step_handler(msg, process_add)
+        bot.send_message(message.chat.id, "Enter film name")
 
     #------------------BACK----------------
     elif text == "back":
@@ -126,11 +134,8 @@ def handler(message):
 
     # ---------------- RECOMMEND ----------------
     elif text == "рекомендация":
-        msg = bot.send_message(message.chat.id, "What do you want?")
-        bot.register_next_step_handler(
-            msg,
-            lambda m: _handle_recommend(m)
-        )
+        state[message.chat.id] = "recommend"
+        bot.send_message(message.chat.id, "What do you want?")
 
 
 def _handle_recommend(m):
@@ -138,4 +143,5 @@ def _handle_recommend(m):
     result = recommendation_service.recommend(m.text)
     print("Recommendation ready")
     bot.send_message(m.chat.id, result.message)
+    state[m.chat.id] = "main"
     print("Message sent")
