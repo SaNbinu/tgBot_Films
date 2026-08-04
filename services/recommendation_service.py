@@ -184,8 +184,25 @@ class RecommendationService:
         print(f"Source keywords ({movie.get('title', '?')}): {details.get('keywords', [])}")
         print(f"Source keywords are EMPTY: {not details.get('keywords')}")
 
+        details["director"] = ""
+        details["cast"] = []
+        try:
+            people = self.tmdb.get_movie_people(source_id)
+            details["director"] = people.get("director", "")
+            details["cast"] = people.get("cast", [])
+        except Exception as e:
+            print(f"get_movie_people (source): FAILED {e}")
+
         for c in raw_candidates:
             c["keywords"] = self.tmdb.get_movie_keywords(c["id"])
+            c["director"] = ""
+            c["cast"] = []
+            try:
+                people = self.tmdb.get_movie_people(c["id"])
+                c["director"] = people.get("director", "")
+                c["cast"] = people.get("cast", [])
+            except Exception as e:
+                print(f"get_movie_people ({c.get('title', '?')}): FAILED {e}")
 
         def _score_and_sort(group: list[dict], label: str) -> list[tuple[float, dict[str, float], dict]]:
             if not group:
@@ -205,6 +222,13 @@ class RecommendationService:
                 print(f"\n  {c.get('title', '?')}")
                 print(f"    _source = {c.get('_source', 'N/A')}")
                 print(f"    endpoint_bonus = {endpoint_bonus:.2f}")
+                print(f"    director match: {components.get('director', 0.0) > 0}")
+                shared = sorted(
+                    {n.strip().lower() for n in details.get("cast", []) if n and n.strip()}
+                    & {n.strip().lower() for n in c.get("cast", []) if n and n.strip()}
+                )
+                print(f"    shared actors: {shared}")
+                print(f"    cast score: {components.get('cast', 0.0):.2f}")
                 print(f"    source keywords ({len(s_kw)}): {sorted(s_kw)}")
                 print(f"    source keywords EMPTY: {not s_kw}")
                 print(f"    candidate keywords ({len(c_kw)}): {sorted(c_kw)}")

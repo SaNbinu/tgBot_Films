@@ -9,6 +9,8 @@ WEIGHT_YEAR: float = 10.0
 WEIGHT_RATING: float = 8.0
 WEIGHT_POPULARITY: float = 5.0
 WEIGHT_BONUS: float = 8.0
+WEIGHT_DIRECTOR: float = 15.0
+WEIGHT_CAST: float = 10.0
 
 MAX_YEAR_DIFF: int = 20
 MAX_VOTE_COUNT: int = 100_000
@@ -89,6 +91,23 @@ def score_movie(
     pop_factor = math.log(vote_count + 1) / math.log(MAX_VOTE_COUNT + 1)
     components["popularity"] = pop_factor * WEIGHT_POPULARITY
     score += components["popularity"]
+
+    source_director = (source.get("director") or "").strip().lower()
+    candidate_director = (candidate.get("director") or "").strip().lower()
+    if source_director and candidate_director == source_director:
+        components["director"] = WEIGHT_DIRECTOR
+    else:
+        components["director"] = 0.0
+    score += components["director"]
+
+    source_cast = {name.strip().lower() for name in source.get("cast", []) if name and name.strip()}
+    candidate_cast = {name.strip().lower() for name in candidate.get("cast", []) if name and name.strip()}
+    if source_cast:
+        cast_overlap = source_cast & candidate_cast
+        components["cast"] = (len(cast_overlap) / len(source_cast)) * WEIGHT_CAST
+    else:
+        components["cast"] = 0.0
+    score += components["cast"]
 
     source_tag = candidate.get("_source", "")
     if source_tag == "recommendation":

@@ -134,6 +134,30 @@ class TMDBClient:
             return []
         return [kw["name"] for kw in data.get("keywords", [])]
 
+    def get_movie_people(self, movie_id: int) -> dict:
+        """Get the director and main cast for a movie from /movie/{id}/credits.
+
+        Args:
+            movie_id: TMDB movie ID.
+
+        Returns:
+            A dict with "director" (str) and "cast" (list of str) keys.
+            Empty values if no credits data is available.
+        """
+        data = self._get(f"/movie/{movie_id}/credits")
+        if not data:
+            return {"director": "", "cast": []}
+
+        director = ""
+        for crew in data.get("crew", []):
+            if crew.get("job") == "Director":
+                director = crew.get("name", "")
+                break
+
+        cast = [m.get("name", "") for m in data.get("cast", [])[:7] if m.get("name")]
+
+        return {"director": director, "cast": cast}
+
     def get_movie_details(self, movie_id: int) -> dict | None:
         """Get full details for a movie by its TMDB ID.
 
