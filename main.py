@@ -1,3 +1,4 @@
+import handlers.movie
 import handlers.start
 import handlers.films
 from bot import bot

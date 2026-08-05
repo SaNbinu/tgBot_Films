@@ -183,6 +183,10 @@ class TMDBClient:
 
         Returns:
             A dict with full movie details, or None if not found.
+            Includes id, title, original_title, overview, release_date,
+            vote_average, vote_count, poster_path, backdrop_path, genres,
+            runtime, budget, revenue, tagline, status, homepage, imdb_id,
+            production_companies, production_countries and original_language.
         """
         data = self._get(f"/movie/{movie_id}")
         if not data:
@@ -206,7 +210,23 @@ class TMDBClient:
             "homepage": data.get("homepage"),
             "imdb_id": data.get("imdb_id"),
             "production_companies": data.get("production_companies", []),
+            "production_countries": data.get("production_countries", []),
+            "original_language": data.get("original_language"),
         }
+
+    def get_poster_url(self, poster_path: str | None, size: str = "w500") -> str | None:
+        """Build a full TMDB poster URL from a poster path.
+
+        Args:
+            poster_path: A poster path from TMDB (e.g. "/abc.jpg").
+            size: Image size variant (default "w500").
+
+        Returns:
+            A full https URL to the poster image, or None if no path given.
+        """
+        if not poster_path:
+            return None
+        return f"https://image.tmdb.org/t/p/{size}{poster_path}"
 
     def search_person(self, name: str, language: str | None = None) -> dict | None:
         """Search for a person (actor, director, etc.) by name.
