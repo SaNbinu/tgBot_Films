@@ -9,36 +9,33 @@ from services.movie_scorer import score_movie
 from services.recommendation_result import RecommendationResult
 
 GENRE_RU_TO_TMDB: dict[str, int] = {
-    "боевик": 28, "боевики": 28, "боевика": 28, "боевиков": 28,
-    "комедия": 35, "комедии": 35, "комедию": 35, "комедийный": 35,
-    "ужасы": 27, "ужасов": 27, "ужастик": 27, "ужастики": 27, "ужастиков": 27,
-    "фантастика": 878, "фантастику": 878, "фантастический": 878,
-    "фантастические": 878, "фантастических": 878,
-    "драма": 18, "драмы": 18, "драму": 18,
-    "триллер": 53, "триллеры": 53, "триллера": 53, "триллеров": 53,
-    "мелодрама": 10749, "мелодрамы": 10749, "мелодраму": 10749,
-    "детектив": 9648, "детективы": 9648, "детектива": 9648,
-    "детективов": 9648, "детективный": 9648,
-    "приключения": 12, "приключенческий": 12, "приключенческие": 12,
-    "приключенческих": 12,
-    "мультфильм": 16, "мультфильмы": 16, "мультфильмов": 16,
-    "мультик": 16, "мультики": 16, "мультиков": 16, "мульт": 16,
-    "аниме": 16,
-    "фэнтези": 14,
-    "вестерн": 37, "вестерны": 37,
-    "документальный": 99,
-    "исторический": 36,
-    "военный": 10752, "военные": 10752, "военных": 10752,
-    "музыкальный": 10402,
-    "криминал": 80, "криминальный": 80, "криминала": 80,
-    "семейный": 10751, "семейные": 10751, "семейных": 10751,
+    "action": 28, "action movie": 28, "action movies": 28,
+    "comedy": 35, "comedies": 35, "comedic": 35,
+    "horror": 27, "horror movie": 27, "horror movies": 27, "scary": 27,
+    "sci-fi": 878, "scifi": 878, "science fiction": 878, "space": 878,
+    "drama": 18, "dramas": 18,
+    "thriller": 53, "thrillers": 53,
+    "melodrama": 10749, "melodramas": 10749, "romance": 10749, "romantic": 10749,
+    "mystery": 9648, "mysteries": 9648, "detective": 9648, "detectives": 9648,
+    "adventure": 12, "adventures": 12,
+    "cartoon": 16, "cartoons": 16, "animated": 16, "animation": 16, "anime": 16,
+    "fantasy": 14,
+    "western": 37, "westerns": 37,
+    "documentary": 99, "documentaries": 99,
+    "historical": 36, "history": 36,
+    "war": 10752, "wars": 10752, "war movie": 10752, "war movies": 10752,
+    "musical": 10402, "musicals": 10402,
+    "crime": 80, "criminal": 80,
+    "family": 10751, "family movie": 10751,
 }
 
 GENRE_THEME_TO_TMDB: dict[str, int] = {
-    "космос": 878,
-    "войну": 10752,
-    "зомби": 27,
-    "вампиров": 27,
+    "space": 878,
+    "war": 10752,
+    "zombie": 27,
+    "zombies": 27,
+    "vampire": 27,
+    "vampires": 27,
 }
 
 
@@ -88,7 +85,7 @@ class RecommendationService:
         if not movie_title:
             return RecommendationResult(
                 success=False,
-                message="Укажите название фильма.",
+                message="Please specify the movie title.",
                 movies=[],
             )
 
@@ -114,7 +111,7 @@ class RecommendationService:
             print("  -> Movie not found by TMDB after normalization.")
             return RecommendationResult(
                 success=False,
-                message="Фильм не найден.",
+                message="Movie not found.",
                 movies=[],
             )
 
@@ -144,7 +141,7 @@ class RecommendationService:
         if not details:
             return RecommendationResult(
                 success=False,
-                message="Не удалось получить информацию о фильме.",
+                message="Failed to fetch movie information.",
                 movies=[],
             )
 
@@ -176,7 +173,7 @@ class RecommendationService:
         if not raw_candidates:
             return RecommendationResult(
                 success=False,
-                message="Похожие фильмы не найдены.",
+                message="No similar movies found.",
                 movies=[],
             )
 
@@ -316,7 +313,7 @@ class RecommendationService:
 
         top3 = selected[:3]
 
-        text = "🎬 Похожие фильмы:\n\n"
+        text = "🎬 Similar movies:\n\n"
         for i, m in enumerate(top3, 1):
             title = m.get("title", "Unknown")
             year = m.get("release_date", "")[:4] if m.get("release_date") else "N/A"
@@ -326,8 +323,8 @@ class RecommendationService:
                 if len(overview) > 220:
                     overview = overview[:220].rsplit(" ", 1)[0] + "..."
             else:
-                overview = "Описание отсутствует."
-            text += f"{i}. {title} ({year})\n⭐ Рейтинг TMDB: {rating}\n\n{overview}\n\n"
+                overview = "No description available."
+            text += f"{i}. {title} ({year})\n⭐ TMDB rating: {rating}\n\n{overview}\n\n"
             if i < len(top3):
                 text += "----------------\n\n"
 
@@ -347,7 +344,7 @@ class RecommendationService:
         if not value:
             return RecommendationResult(
                 success=False,
-                message="Укажите имя актёра или режиссёра.",
+                message="Please specify an actor or director name.",
                 movies=[],
             )
 
@@ -367,7 +364,7 @@ class RecommendationService:
             if not person:
                 return RecommendationResult(
                     success=False,
-                    message="Актёр или режиссёр не найден.",
+                    message="Actor or director not found.",
                     movies=[],
                 )
 
@@ -410,7 +407,7 @@ class RecommendationService:
         if not filtered:
             return RecommendationResult(
                 success=False,
-                message=f"У {display_name} не найдено фильмов в роли {'режиссёра' if role == 'director' else 'актёра'}.",
+                message=f"No movies found for {display_name} as a {'director' if role == 'director' else 'actor'}.",
                 movies=[],
             )
 
@@ -424,7 +421,7 @@ class RecommendationService:
         unique.sort(key=lambda m: (-(m.get("vote_average") or 0), -(m.get("vote_count") or 0)))
         top = unique[:5]
 
-        header = "🎬 Фильмы режиссёра" if role == "director" else "🎬 Фильмы с"
+        header = "🎬 Movies directed by" if role == "director" else "🎬 Movies with"
         text = f"{header} {display_name}:\n\n"
         for i, m in enumerate(top, 1):
             title = m.get("title", "Unknown")
@@ -435,8 +432,8 @@ class RecommendationService:
                 if len(overview) > 220:
                     overview = overview[:220].rsplit(" ", 1)[0] + "..."
             else:
-                overview = "Описание отсутствует."
-            text += f"{i}. {title} ({year})\n⭐ Рейтинг TMDB: {rating}\n\n{overview}\n\n"
+                overview = "No description available."
+            text += f"{i}. {title} ({year})\n⭐ TMDB rating: {rating}\n\n{overview}\n\n"
             if i < len(top):
                 text += "----------------\n\n"
 
@@ -456,7 +453,7 @@ class RecommendationService:
         if not value:
             return RecommendationResult(
                 success=False,
-                message="Укажите жанр.",
+                message="Please specify a genre.",
                 movies=[],
             )
 
@@ -464,7 +461,7 @@ class RecommendationService:
         if not genre_id:
             return RecommendationResult(
                 success=False,
-                message=f"Жанр «{value}» не найден.",
+                message=f"Genre '{value}' not found.",
                 movies=[],
             )
 
@@ -493,7 +490,7 @@ class RecommendationService:
         if not candidates:
             return RecommendationResult(
                 success=False,
-                message=f"Фильмы жанра «{genre_display}» не найдены.",
+                message=f"No movies found for the genre '{genre_display}'.",
                 movies=[],
             )
 
@@ -555,7 +552,7 @@ class RecommendationService:
         for movie in all_sorted[:10]:
             print(movie["title"], movie["vote_average"], movie["vote_count"])
 
-        text = f"🎬 Лучшие фильмы жанра «{genre_display}»:\n\n"
+        text = f"🎬 Best '{genre_display}' movies:\n\n"
         for i, m in enumerate(top, 1):
             title = m.get("title", "Unknown")
             year = m.get("release_date", "")[:4] if m.get("release_date") else "N/A"
@@ -565,8 +562,8 @@ class RecommendationService:
                 if len(overview) > 220:
                     overview = overview[:220].rsplit(" ", 1)[0] + "..."
             else:
-                overview = "Описание отсутствует."
-            text += f"{i}. {title} ({year})\n⭐ Рейтинг TMDB: {rating}\n\n{overview}\n\n"
+                overview = "No description available."
+            text += f"{i}. {title} ({year})\n⭐ TMDB rating: {rating}\n\n{overview}\n\n"
             if i < len(top):
                 text += "----------------\n\n"
 
@@ -583,7 +580,7 @@ class RecommendationService:
         except Exception as e:
             return RecommendationResult(
                 success=False,
-                message=f"Не удалось обработать запрос: {e}",
+                message=f"Failed to process the request: {e}",
                 movies=[],
             )
         return RecommendationResult(

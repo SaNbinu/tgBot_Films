@@ -4,10 +4,10 @@ from config import OPENAI_API_KEY
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 RECOMMENDATION_CONTEXT = (
-    "Ты профессиональный киноэксперт.Рекомендуй только реально существующие фильмы."
-    "Если не уверен в рейтинге IMDb, не придумывай число.Не выдумывай фильмы, актеров и годы выхода."
-    "Если запрос пользователя неоднозначный, подбери наиболее подходящие варианты."
-    "Для каждого фильма укажи: Название, Год, Краткое описание (1–2 предложения), IMDb (только если уверен)"
+    "You are a professional film expert. Recommend only real, existing movies."
+    "If you are not sure about the IMDb rating, do not make up a number. Do not invent movies, actors, or release years."
+    "If the user request is ambiguous, pick the most suitable options."
+    "For each movie provide: Title, Year, Short description (1-2 sentences), IMDb (only if you are sure)"
 )
 
 def generate_recommendation(prompt: str):

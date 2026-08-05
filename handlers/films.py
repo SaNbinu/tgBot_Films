@@ -28,7 +28,7 @@ state = {}
 
 def format_films(rows):
     if not rows:
-        return "Список пуст"
+        return "List is empty"
 
     text = ""
     for i, item in enumerate(rows):
@@ -89,7 +89,7 @@ def handler(message):
         bot.send_message(message.chat.id, "Choose option", reply_markup=films_menu())
 
     # ---------------- WATCHED ----------------
-    elif text == "смотрел":
+    elif text == "watched":
         state[message.chat.id] = "watched"
 
         data = get_films(message.chat.id, "watched")
@@ -101,7 +101,7 @@ def handler(message):
         )
 
     # ---------------- WANTED ----------------
-    elif text == "желание":
+    elif text == "wanted":
         state[message.chat.id] = "wanted"
 
         data = get_films(message.chat.id, "wanted")
@@ -133,7 +133,7 @@ def handler(message):
         )
 
     # ---------------- RECOMMEND ----------------
-    elif text == "рекомендация":
+    elif text == "recommendation":
         state[message.chat.id] = "recommend"
         bot.send_message(message.chat.id, "What do you want?")
 

@@ -4,9 +4,11 @@ from typing import Any, Literal
 from requests.exceptions import RequestException
 
 
+from services.title_matcher import pick_best_match
+
 TMDB_API_KEY: str | None = os.getenv("TMDB_API_KEY")
 TMDB_BASE_URL: str = "https://api.themoviedb.org/3"
-TMDB_LANGUAGE: str = "ru-RU"
+TMDB_LANGUAGE: str = "en-US"
 
 
 class TMDBClient:
@@ -38,13 +40,20 @@ class TMDBClient:
             raise ConnectionError(f"TMDB API request failed: {e}") from e
 
     def search_movie(self, title: str) -> dict | None:
-        """Search for a movie by title and return the first result.
+        """Search for a movie by title and return the best matching result.
+
+        The first TMDB result is not taken blindly: the closest title match
+        is selected, comparing by lemma while ignoring case, punctuation and
+        grammatical inflections. Results with extra words that are not part
+        of the query (e.g. "Челюсти Крёстного отца" for "Крёстный отец")
+        lose to an exact match. Returns None when no result matches closely
+        enough, so the caller can try title normalization.
 
         Args:
             title: Movie title to search for.
 
         Returns:
-            A dict with movie data if found, or None if no results.
+            A dict with movie data if a close match was found, or None.
         """
         data = self._get("/search/movie", {"query": title})
         if not data:
@@ -52,17 +61,20 @@ class TMDBClient:
         results = data.get("results")
         if not results:
             return None
-        first = results[0]
+        best = pick_best_match(title, results)
+        print(f"search_movie: {len(results)} result(s), best match: {best.get('title') if best else None}")
+        if best is None:
+            return None
         return {
-            "id": first["id"],
-            "title": first["title"],
-            "original_title": first["original_title"],
-            "overview": first.get("overview"),
-            "release_date": first.get("release_date"),
-            "vote_average": first.get("vote_average"),
-            "vote_count": first.get("vote_count"),
-            "poster_path": first.get("poster_path"),
-            "genre_ids": first.get("genre_ids", []),
+            "id": best["id"],
+            "title": best["title"],
+            "original_title": best["original_title"],
+            "overview": best.get("overview"),
+            "release_date": best.get("release_date"),
+            "vote_average": best.get("vote_average"),
+            "vote_count": best.get("vote_count"),
+            "poster_path": best.get("poster_path"),
+            "genre_ids": best.get("genre_ids", []),
         }
 
     def get_similar_movies(self, movie_id: int, limit: int = 10) -> list[dict]:
@@ -87,6 +99,8 @@ class TMDBClient:
                 "overview": m.get("overview"),
                 "release_date": m.get("release_date"),
                 "vote_average": m.get("vote_average"),
+                "vote_count": m.get("vote_count"),
+                "popularity": m.get("popularity"),
                 "poster_path": m.get("poster_path"),
             }
             for m in results[:limit]
@@ -101,7 +115,8 @@ class TMDBClient:
 
         Returns:
             A list of recommended movies with id, title, overview,
-            release_date, vote_average, poster_path, genre_ids.
+            release_date, vote_average, vote_count, popularity,
+            poster_path, genre_ids.
         """
         data = self._get(f"/movie/{movie_id}/recommendations")
         if not data:
@@ -114,6 +129,8 @@ class TMDBClient:
                 "overview": m.get("overview"),
                 "release_date": m.get("release_date"),
                 "vote_average": m.get("vote_average"),
+                "vote_count": m.get("vote_count"),
+                "popularity": m.get("popularity"),
                 "poster_path": m.get("poster_path"),
                 "genre_ids": m.get("genre_ids", []),
             }

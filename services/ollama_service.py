@@ -3,25 +3,25 @@ from typing import Any
 
 
 SYSTEM_PROMPT: str = (
-    "Ты опытный киноэксперт. Отвечай только на русском языке.\n\n"
-    "Фильмы уже выбраны. Твоя задача — объяснить, почему каждый подходит. "
-    "Не придумывай фильмы. Не меняй порядок. Не пропускай фильмы. "
-    "Не пиши вступление и заключение.\n\n"
-    "Для каждого фильма выведи:\n"
-    "1. Название (год)\n"
-    "⭐ рейтинг TMDB\n\n"
-    "2–3 предложения с объяснением.\n"
+    "You are an experienced film expert. Respond only in English.\n\n"
+    "Movies have already been selected. Your task is to explain why each one fits. "
+    "Don't invent movies. Don't change the order. Don't skip movies. "
+    "Don't write an introduction or a conclusion.\n\n"
+    "For each movie provide:\n"
+    "1. Title (year)\n"
+    "⭐ TMDB rating\n\n"
+    "2-3 sentences with an explanation.\n"
 )
 
 
 NORMALIZER_SYSTEM_PROMPT: str = (
-    "Ты нормализатор названий фильмов.\n"
-    "Твоя задача — преобразовать пользовательский запрос к каноническому названию фильма.\n\n"
-    "Правила:\n"
-    "1. Не переводи язык.\n"
-    "2. Не добавляй ничего лишнего.\n"
-    "3. Верни только официальное название фильма в именительном падеже.\n"
-    "4. Если запрос уже является названием фильма — верни его без изменений.\n"
+    "You are a movie title normalizer.\n"
+    "Your task is to convert a user query into the canonical movie title.\n\n"
+    "Rules:\n"
+    "1. Do not translate the language.\n"
+    "2. Don't add anything extra.\n"
+    "3. Return only the official movie title.\n"
+    "4. If the query is already a movie title — return it unchanged.\n"
 )
 
 
@@ -44,7 +44,7 @@ class OllamaService:
         Returns:
             A list of up to 3 movie titles selected by the model.
         """
-        source_title = (source_movie or {}).get("title", "Неизвестный фильм")
+        source_title = (source_movie or {}).get("title", "Unknown movie")
 
         candidate_lines = "\n".join(
             f"{i}. «{m.get('title', '?')}» ({m.get('release_date', '')[:4]})"
@@ -52,36 +52,36 @@ class OllamaService:
         )
 
         prompt = (
-            "Ты профессиональный кинокритик.\n\n"
-            "Тебе дан исходный фильм и список фильмов-кандидатов.\n\n"
-            "Твоя задача — выбрать ТОЛЬКО 3 фильма, которые максимально похожи по СМЫСЛУ.\n\n"
-            "Приоритет оценки (от самого важного к менее важному):\n\n"
-            "1. Центральная идея фильма.\n"
-            "2. Главная тема.\n"
-            "3. Концепция мира.\n"
-            "4. Атмосфера.\n"
-            "5. Тип повествования.\n"
-            "6. Эмоции после просмотра.\n"
-            "7. Тип конфликта.\n"
-            "8. Только потом жанр.\n\n"
-            "НЕ выбирай фильм только потому что:\n\n"
-            "- совпадает жанр;\n"
-            "- есть искусственный интеллект;\n"
-            "- есть космос;\n"
-            "- есть мафия;\n"
-            "- есть супергерои;\n"
-            "- фильм очень популярный.\n\n"
-            "Если есть фильм менее популярный, но намного ближе по смыслу — выбирай именно его.\n\n"
-            "Представь, что пользователь после просмотра исходного фильма сказал:\n\n"
-            "\"Хочу испытать похожие ощущения.\"\n\n"
-            "Именно это должно определять выбор.\n\n"
-            "Ответь только тремя названиями.\n"
-            "Без номеров.\n"
-            "Без пояснений.\n"
-            "Без дополнительных слов.\n"
-            "Каждое название с новой строки.\n\n"
-            f"Исходный фильм:\n{source_title}\n\n"
-            f"Кандидаты:\n{candidate_lines}"
+            "You are a professional film critic.\n\n"
+            "You are given a source movie and a list of candidate movies.\n\n"
+            "Your task is to choose ONLY 3 movies that are the most similar in MEANING.\n\n"
+            "Priority of evaluation (from most to least important):\n\n"
+            "1. The central idea of the movie.\n"
+            "2. The main theme.\n"
+            "3. The world concept.\n"
+            "4. The atmosphere.\n"
+            "5. The type of storytelling.\n"
+            "6. The emotions after watching.\n"
+            "7. The type of conflict.\n"
+            "8. Only then genre.\n\n"
+            "Do NOT choose a movie just because:\n\n"
+            "- the genre matches;\n"
+            "- it features artificial intelligence;\n"
+            "- it features space;\n"
+            "- it features mafia;\n"
+            "- it features superheroes;\n"
+            "- the movie is very popular.\n\n"
+            "If there is a less popular movie but much closer in meaning — choose it.\n\n"
+            "Imagine that the user said after watching the source movie:\n\n"
+            "\"I want to feel something similar.\"\n\n"
+            "That should determine your choice.\n\n"
+            "Answer with only three titles.\n"
+            "No numbers.\n"
+            "No explanations.\n"
+            "No extra words.\n"
+            "One title per line.\n\n"
+            f"Source movie:\n{source_title}\n\n"
+            f"Candidates:\n{candidate_lines}"
         )
 
         print("=== OLLAMA PROMPT ===")
@@ -114,16 +114,16 @@ class OllamaService:
             returned an empty response.
         """
         prompt = (
-            "Преобразуй пользовательский запрос к каноническому названию фильма.\n"
-            "Не переводи язык.\n"
-            "Не добавляй ничего.\n"
-            "Верни только официальное название фильма в именительном падеже.\n\n"
-            "Примеры:\n"
-            "матрицу -> Матрица\n"
-            "начала -> Начало\n"
-            "интерстеллара -> Интерстеллар\n"
-            "крестного отца -> Крёстный отец\n\n"
-            f"Запрос: {query}\n"
+            "Convert the user query to the canonical movie title.\n"
+            "Do not translate the language.\n"
+            "Do not add anything.\n"
+            "Return only the official movie title.\n\n"
+            "Examples:\n"
+            "godfather -> The Godfather\n"
+            "dark knight -> The Dark Knight\n"
+            "harry potter -> Harry Potter and the Philosopher's Stone\n"
+            "green mile -> The Green Mile\n\n"
+            f"Query: {query}\n"
         )
 
         print("=== OLLAMA NORMALIZER PROMPT ===")
@@ -151,10 +151,10 @@ class OllamaService:
         """
         movies_text = self._format_movies(movies)
         prompt = (
-            f"Запрос пользователя: {user_query}\n\n"
-            f"Вот реальные фильмы из базы данных:\n{movies_text}\n\n"
-            "Дай рекомендацию на основе этих фильмов. "
-            "Не выдумывай фильмы, которых нет в списке."
+            f"User query: {user_query}\n\n"
+            f"Here are the real movies from the database:\n{movies_text}\n\n"
+            "Give a recommendation based on these movies. "
+            "Do not invent movies that are not in the list."
         )
         return self._query_model(prompt)
 
@@ -181,8 +181,8 @@ class OllamaService:
                 if len(overview) > 190:
                     overview = overview[:190].rsplit(" ", 1)[0] + "..."
             else:
-                overview = "Описание отсутствует"
-            lines.append(f"{i}. {title} ({year}) — рейтинг: {rating}\n   {overview}")
+                overview = "No description available"
+            lines.append(f"{i}. {title} ({year}) — rating: {rating}\n   {overview}")
         return "\n\n".join(lines)
 
     def _query_model(self, prompt: str, system_prompt: str = SYSTEM_PROMPT) -> str:
