@@ -43,19 +43,27 @@ def format_films(rows):
 def process_add(message):
     current = state.get(message.chat.id)
 
+    movie = tmdb.search_movie(message.text)
+
+    if not movie:
+        bot.send_message(message.chat.id, "Movie not found. Try another title.")
+        return
+
+    title = movie["title"]
+
     if current == "add_watched":
-        add_film(message.chat.id, message.text, "watched")
+        add_film(message.chat.id, title, "watched")
         data = get_films(message.chat.id, "watched")
 
     elif current == "add_wanted":
-        add_film(message.chat.id, message.text, "wanted")
+        add_film(message.chat.id, title, "wanted")
         data = get_films(message.chat.id, "wanted")
 
     else:
         bot.send_message(message.chat.id, "Error state")
         return
 
-    bot.send_message(message.chat.id, "Added")
+    bot.send_message(message.chat.id, f"Added: {title}")
     bot.send_message(
         message.chat.id,
         format_films(data),
