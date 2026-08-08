@@ -1,6 +1,6 @@
 from bot import bot
 from keyboards.menus import films_menu, watched_menu, wanted_menu
-from services.db import add_film, get_films
+from services.db import add_film, delete_movie, get_films
 from services.query_analyzer import QueryAnalyzer
 from services.tmdb_service import TMDBClient
 from services.ollama_service import OllamaService
@@ -31,8 +31,8 @@ def format_films(rows):
         return "List is empty"
 
     text = ""
-    for i, item in enumerate(rows):
-        text += f"{i}. {item[0]} | {item[1]}\n"
+    for i, item in enumerate(rows, 1):
+        text += f"{i}. {item[0]} | {item[1][:10]}\n"
     return text
 
 
@@ -66,6 +66,38 @@ def process_add(message):
 
 
 # ================================================================
+# DELETE LOGIC
+# ================================================================
+
+def process_delete(message):
+    current = state.get(message.chat.id)
+
+    if current == "delete_watched":
+        status = "watched"
+    elif current == "delete_wanted":
+        status = "wanted"
+    else:
+        bot.send_message(message.chat.id, "Error state")
+        return
+
+    deleted = delete_movie(message.chat.id, message.text, status)
+    data = get_films(message.chat.id, status)
+
+    if deleted:
+        bot.send_message(message.chat.id, "Deleted")
+    else:
+        bot.send_message(message.chat.id, "Movie not found in the list")
+
+    bot.send_message(
+        message.chat.id,
+        format_films(data),
+        reply_markup=films_menu()
+    )
+
+    state[message.chat.id] = "main"
+
+
+# ================================================================
 # HANDLER
 # ================================================================
 
@@ -87,6 +119,11 @@ def handler(message):
     # ---------------- FSM: ADD ----------------
     if current in ("add_watched", "add_wanted"):
         process_add(message)
+        return
+
+    # ---------------- FSM: DELETE ----------------
+    if current in ("delete_watched", "delete_wanted"):
+        process_delete(message)
         return
 
     # ---------------- FSM: RECOMMEND ----------------
@@ -132,6 +169,17 @@ def handler(message):
             state[message.chat.id] = "add_watched"
 
         bot.send_message(message.chat.id, "Enter film name")
+
+    # ---------------- DELETE ----------------
+    elif text == "delete movie":
+        if current == "watched":
+            state[message.chat.id] = "delete_watched"
+        elif current == "wanted":
+            state[message.chat.id] = "delete_wanted"
+        else:
+            state[message.chat.id] = "delete_watched"
+
+        bot.send_message(message.chat.id, "Enter film name to delete")
 
     # ---------------- RECOMMEND ----------------
     elif text == "recommendation":

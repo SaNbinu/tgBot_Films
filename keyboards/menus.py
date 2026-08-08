@@ -15,13 +15,13 @@ def films_menu():
 
 def watched_menu():
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    kb.add("Add")
+    kb.add("Add", "Delete movie")
     kb.add("Back")
     return kb
 
 
 def wanted_menu():
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    kb.add("Add")
+    kb.add("Add", "Delete movie")
     kb.add("Back")
     return kb

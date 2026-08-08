@@ -53,3 +53,19 @@ def get_films(user_id: int, status: str):
     conn.close()
 
     return rows
+
+
+def delete_movie(user_id: int, name: str, status: str):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        DELETE FROM films
+        WHERE user_id=? AND status=? AND name=?
+    """, (user_id, status, name))
+
+    conn.commit()
+    deleted = cur.rowcount
+    conn.close()
+
+    return deleted
