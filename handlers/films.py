@@ -74,6 +74,16 @@ def handler(message):
     current = state.get(message.chat.id)
     text = message.text.lower()
 
+    # ---------------- BACK ----------------
+    if text == "back":
+        state[message.chat.id] = "main"
+        bot.send_message(
+            message.chat.id,
+            "Main menu",
+            reply_markup=films_menu()
+        )
+        return
+
     # ---------------- FSM: ADD ----------------
     if current in ("add_watched", "add_wanted"):
         process_add(message)
@@ -122,15 +132,6 @@ def handler(message):
             state[message.chat.id] = "add_watched"
 
         bot.send_message(message.chat.id, "Enter film name")
-
-    #------------------BACK----------------
-    elif text == "back":
-        state[message.chat.id] = "main"
-        bot.send_message(
-            message.chat.id,
-            "Main menu",
-            reply_markup=films_menu()
-        )
 
     # ---------------- RECOMMEND ----------------
     elif text == "recommendation":
