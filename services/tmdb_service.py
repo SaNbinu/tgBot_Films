@@ -165,11 +165,15 @@ class TMDBClient:
         if not data:
             return {"director": "", "cast": []}
 
-        director = ""
-        for crew in data.get("crew", []):
-            if crew.get("job") == "Director":
-                director = crew.get("name", "")
-                break
+        director = ", ".join(
+            d
+            for d in (
+                crew.get("name", "")
+                for crew in data.get("crew", [])
+                if crew.get("job") == "Director"
+            )
+            if d
+        )
 
         cast = [m.get("name", "") for m in data.get("cast", [])[:7] if m.get("name")]
 
