@@ -3,6 +3,8 @@ from services.tmdb_service import TMDBClient
 
 tmdb = TMDBClient()
 
+pending = set()
+
 _LANGUAGE_NAMES = {
     "ar": "Arabic", "cs": "Czech", "da": "Danish", "de": "German",
     "en": "English", "es": "Spanish", "fi": "Finnish", "fr": "French",
@@ -72,26 +74,31 @@ def handle_movie(message):
         arg = message.text.split(" ", 1)[1].strip()
 
     if not arg:
+        pending.add(message.chat.id)
         bot.send_message(
             message.chat.id,
-            "Usage: /movie <title or TMDB id>",
+            "Enter movie title:",
         )
         return
 
+    _show_movie(message.chat.id, arg)
+
+
+def _show_movie(chat_id: int, arg: str):
     if arg.isdigit():
         movie_id = int(arg)
         details = tmdb.get_movie_details(movie_id)
         if not details:
-            bot.send_message(message.chat.id, "Movie not found.")
+            bot.send_message(chat_id, "Movie not found.")
             return
     else:
         movie = tmdb.search_movie(arg)
         if not movie:
-            bot.send_message(message.chat.id, "Movie not found.")
+            bot.send_message(chat_id, "Movie not found.")
             return
         details = tmdb.get_movie_details(movie["id"])
         if not details:
-            bot.send_message(message.chat.id, "Movie not found.")
+            bot.send_message(chat_id, "Movie not found.")
             return
 
     people = tmdb.get_movie_people(details["id"])
@@ -102,8 +109,19 @@ def handle_movie(message):
         try:
             if len(text) > 1024:
                 text = text[:1021] + "..."
-            bot.send_photo(message.chat.id, poster, caption=text)
+            bot.send_photo(chat_id, poster, caption=text)
         except Exception:
-            bot.send_message(message.chat.id, text)
+            bot.send_message(chat_id, text)
     else:
-        bot.send_message(message.chat.id, text)
+        bot.send_message(chat_id, text)
+
+
+@bot.message_handler(func=lambda m: m.chat.id in pending)
+def handle_movie_pending(message):
+    pending.discard(message.chat.id)
+
+    if message.text.lower() == "back":
+        bot.send_message(message.chat.id, "Main menu")
+        return
+
+    _show_movie(message.chat.id, message.text)

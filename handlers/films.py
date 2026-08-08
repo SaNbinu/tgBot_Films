@@ -43,6 +43,14 @@ def format_films(rows):
 def process_add(message):
     current = state.get(message.chat.id)
 
+    if current == "add_watched":
+        status = "watched"
+    elif current == "add_wanted":
+        status = "wanted"
+    else:
+        bot.send_message(message.chat.id, "Error state")
+        return
+
     movie = tmdb.search_movie(message.text)
 
     if not movie:
@@ -51,17 +59,29 @@ def process_add(message):
 
     title = movie["title"]
 
-    if current == "add_watched":
-        add_film(message.chat.id, title, "watched")
-        data = get_films(message.chat.id, "watched")
-
-    elif current == "add_wanted":
-        add_film(message.chat.id, title, "wanted")
-        data = get_films(message.chat.id, "wanted")
-
-    else:
-        bot.send_message(message.chat.id, "Error state")
+    has_content = (
+        movie.get("poster_path")
+        or movie.get("genre_ids")
+        or (movie.get("overview") or "").strip()
+    )
+    if not has_content:
+        bot.send_message(message.chat.id, "Movie not found. Try another title.")
         return
+
+    exists = any(
+        item[0].lower() == title.lower()
+        for item in get_films(message.chat.id, status)
+    )
+    if exists:
+        label = "Watched" if status == "watched" else "Wanted"
+        bot.send_message(
+            message.chat.id,
+            f"Movie already exists in your {label} list.",
+        )
+        return
+
+    add_film(message.chat.id, title, status)
+    data = get_films(message.chat.id, status)
 
     bot.send_message(message.chat.id, f"Added: {title}")
     bot.send_message(
