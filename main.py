@@ -1,5 +1,6 @@
 import handlers.movie
 import handlers.start
+import handlers.help
 import handlers.films
 from bot import bot
 from services.db import init_db

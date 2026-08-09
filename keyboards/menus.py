@@ -1,11 +1,5 @@
 from telebot import types
 
-def start_menu():
-    kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    kb.add("Films")
-    return kb
-
-
 def films_menu():
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
     kb.add("Watched", "Wanted", "Recommendation")
