@@ -62,7 +62,6 @@ class TMDBClient:
         if not results:
             return None
         best = pick_best_match(title, results)
-        print(f"search_movie: {len(results)} result(s), best match: {best.get('title') if best else None}")
         if best is None:
             return None
         return {

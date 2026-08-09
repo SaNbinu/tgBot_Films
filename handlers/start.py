@@ -14,7 +14,9 @@ def start(message):
         "🔎 Find movies and get recommendations based on what you like.\n"
         "📋 Keep track of movies you've watched and want to watch.\n"
         "🎞️ Get detailed information about any movie.\n\n"
-        "💡 Tip: Use /movie <title> to get detailed information about any movie.\n"
+        "💡 Tip:\n"
+        "Use /movie <title> to get detailed information about any movie.\n"
+        "Use /help to see all available commands.\n\n"
         "Use the buttons below to get started.",
         reply_markup=films_menu()
     )

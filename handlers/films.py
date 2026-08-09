@@ -1,3 +1,4 @@
+import logging
 from bot import bot
 from keyboards.menus import films_menu, watched_menu, wanted_menu
 from services.db import add_film, delete_movie, get_films
@@ -10,6 +11,8 @@ from datetime import datetime
 analyzer = QueryAnalyzer()
 tmdb = TMDBClient()
 ollama = OllamaService()
+
+logger = logging.getLogger(__name__)
 
 recommendation_service = RecommendationService(
     analyzer,
@@ -216,9 +219,7 @@ def handler(message):
 
 
 def _handle_recommend(m):
-    print("START recommendation")
+    logger.info("Recommendation requested: %r", m.text)
     result = recommendation_service.recommend(m.text)
-    print("Recommendation ready")
     bot.send_message(m.chat.id, result.message)
     state[m.chat.id] = "main"
-    print("Message sent")

@@ -84,22 +84,13 @@ class OllamaService:
             f"Candidates:\n{candidate_lines}"
         )
 
-        print("=== OLLAMA PROMPT ===")
-        print(prompt)
-        print("=== END PROMPT ===")
-
         response = self._query_model(prompt)
-        print("=== OLLAMA RAW RESPONSE ===")
-        print(response)
-        print("=== END RAW RESPONSE ===")
 
         titles = [
             line.strip().strip('"').strip("«").strip("»").strip("'")
             for line in response.strip().split("\n")
             if line.strip()
         ]
-        print(f"Ollama rerank response:\n{response}")
-        print(f"Parsed titles: {titles}")
         return titles[:3]
 
     def normalize_movie_title(self, query: str) -> str:
@@ -126,14 +117,7 @@ class OllamaService:
             f"Query: {query}\n"
         )
 
-        print("=== OLLAMA NORMALIZER PROMPT ===")
-        print(prompt)
-        print("=== END PROMPT ===")
-
         response = self._query_model(prompt, system_prompt=NORMALIZER_SYSTEM_PROMPT)
-        print("=== OLLAMA NORMALIZER RESPONSE ===")
-        print(response)
-        print("=== END RESPONSE ===")
 
         title = response.replace('"', "").replace("«", "").replace("»", "").replace("'", "")
         title = " ".join(title.split())

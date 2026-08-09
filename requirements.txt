@@ -1,0 +1,8 @@
+# Direct dependencies of MovieScorer
+pyTelegramBotAPI==4.36.0
+requests==2.34.2
+python-dotenv==1.2.2
+ollama==0.6.2
+
+# Optional (wrapped in try/except in services/title_matcher.py)
+pymorphy3

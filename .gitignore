@@ -5,4 +5,8 @@ env/
 
 # Python
 __pycache__/
+*.pyc
 .idea/
+
+# Database
+films.db

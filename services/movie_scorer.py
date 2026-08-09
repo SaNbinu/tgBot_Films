@@ -134,37 +134,6 @@ def score_movie(
         breakdown.update(components)
         breakdown["total"] = score
 
-    print("=" * 50)
-    print(f"Movie: {candidate.get('title', '?')}")
-    print(f"Genres ............. +{components['genre']:.2f}")
-    print(f"Keywords ........... +{components['keywords']:.2f}")
-    print(f"Overview ........... +{components['overview']:.2f}")
-    print(f"Director ........... +{components['director']:.2f}")
-    print(f"Cast ............... +{components['cast']:.2f}")
-    print(f"Year ............... +{components['year']:.2f}")
-    print(f"Rating ............. +{components['rating']:.2f}")
-    print(f"Popularity ......... +{components['popularity']:.2f}")
-    print(f"Endpoint bonus ..... +{components['endpoint_bonus']:.2f}")
-
-    penalties: list[str] = []
-    if genre_overlap < MIN_GENRE_OVERLAP:
-        penalties.append(f"genre overlap < {MIN_GENRE_OVERLAP} (x0.30)")
-    if rating < RATING_THRESHOLD:
-        penalties.append(f"low rating: {rating:.1f} < {RATING_THRESHOLD} (x0.50)")
-    if vote_count < VOTE_COUNT_THRESHOLD:
-        penalties.append(f"low vote_count: {vote_count} < {VOTE_COUNT_THRESHOLD} (x0.50)")
-    if not candidate.get("overview"):
-        penalties.append("missing overview (x0.85)")
-
-    if penalties:
-        print("Penalty:")
-        for p in penalties:
-            print(f"- {p}")
-    else:
-        print("Penalty: none")
-    print(f"TOTAL .............. {score:.2f}")
-    print("=" * 50)
-
     return score
 
 

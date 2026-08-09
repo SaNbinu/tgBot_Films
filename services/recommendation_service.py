@@ -1,5 +1,5 @@
+import logging
 import re
-import time
 from datetime import datetime
 from typing import Literal
 from services.query_analyzer import QueryAnalyzer, QueryType, AnalysisResult
@@ -39,6 +39,9 @@ GENRE_THEME_TO_TMDB: dict[str, int] = {
 }
 
 
+logger = logging.getLogger(__name__)
+
+
 class RecommendationService:
     """Orchestrates movie recommendations using query analysis and TMDB data."""
 
@@ -56,17 +59,11 @@ class RecommendationService:
         Returns:
             A RecommendationResult with the outcome.
         """
-        t_start = time.perf_counter()
-
-        t0 = time.perf_counter()
         result: AnalysisResult = self.analyzer.analyze(user_query)
-        print(f"QueryAnalyzer: {time.perf_counter() - t0:.3f} sec")
-        print(f"  query_type={result.query_type}, value={result.value!r}")
+        logger.info("Query analyzed: type=%s, value=%r", result.query_type, result.value)
 
         if result.query_type == QueryType.SIMILAR_MOVIE:
-            res = self._handle_similar_movie(user_query, result.value)
-            print(f"Total recommend(): {time.perf_counter() - t_start:.3f} sec")
-            return res
+            return self._handle_similar_movie(user_query, result.value)
 
         if result.query_type == QueryType.PERSON:
             return self._handle_person(result.value)
@@ -78,10 +75,6 @@ class RecommendationService:
 
     def _handle_similar_movie(self, user_query: str, movie_title: str | None) -> RecommendationResult:
         """Find top 3 similar movies using TMDB data + custom MovieScorer."""
-        print(f"=== SIMILAR_MOVIE DEBUG ===")
-        print(f"user_query = {user_query!r}")
-        print(f"movie_title = {movie_title!r}")
-
         if not movie_title:
             return RecommendationResult(
                 success=False,
@@ -89,26 +82,18 @@ class RecommendationService:
                 movies=[],
             )
 
-        t0 = time.perf_counter()
-        print(f"Calling search_movie with: {movie_title!r}")
         movie = self.tmdb.search_movie(movie_title)
-        print(f"search_movie: {time.perf_counter() - t0:.3f} sec")
-        print(f"search_movie result: {movie.get('title', 'N/A') if movie else None}")
         if not movie:
-            print("  -> search_movie returned None. Trying Ollama normalization.")
+            logger.info("Movie not found for %r, trying Ollama normalization", movie_title)
             try:
                 normalized = self.ollama.normalize_movie_title(movie_title)
             except Exception as e:
-                print(f"  -> Ollama normalization failed: {e}")
+                logger.warning("Ollama normalization failed: %s", e)
                 normalized = ""
             if normalized:
-                print(f"  -> Normalized title: {normalized!r}")
-                t0 = time.perf_counter()
+                logger.info("Normalized title: %r", normalized)
                 movie = self.tmdb.search_movie(normalized)
-                print(f"  -> Retry search_movie: {time.perf_counter() - t0:.3f} sec")
-                print(f"  -> Retry result: {movie.get('title', 'N/A') if movie else None}")
         if not movie:
-            print("  -> Movie not found by TMDB after normalization.")
             return RecommendationResult(
                 success=False,
                 message="Movie not found.",
@@ -119,25 +104,19 @@ class RecommendationService:
         seen_ids: set[int] = set()
         raw_candidates: list[dict] = []
 
-        t0 = time.perf_counter()
         for r in self.tmdb.get_recommendations(source_id, limit=10):
             if r["id"] != source_id and r["id"] not in seen_ids:
                 r["_source"] = "recommendation"
                 raw_candidates.append(r)
                 seen_ids.add(r["id"])
-        print(f"get_recommendations: {time.perf_counter() - t0:.3f} sec")
 
-        t0 = time.perf_counter()
         for s in self.tmdb.get_similar_movies(source_id, limit=10):
             if s["id"] != source_id and s["id"] not in seen_ids:
                 s["_source"] = "similar"
                 raw_candidates.append(s)
                 seen_ids.add(s["id"])
-        print(f"get_similar_movies: {time.perf_counter() - t0:.3f} sec")
 
-        t0 = time.perf_counter()
         details = self.tmdb.get_movie_details(source_id)
-        print(f"get_movie_details: {time.perf_counter() - t0:.3f} sec")
         if not details:
             return RecommendationResult(
                 success=False,
@@ -149,7 +128,6 @@ class RecommendationService:
             genre_ids = [str(g["id"]) for g in details.get("genres", [])]
             genre_str = ",".join(genre_ids) if genre_ids else ""
             if genre_str:
-                t0 = time.perf_counter()
                 for d in self.tmdb.discover_movies(
                     with_genres=genre_str,
                     vote_average_gte=6.5,
@@ -160,16 +138,11 @@ class RecommendationService:
                         d["_source"] = "discover"
                         raw_candidates.append(d)
                         seen_ids.add(d["id"])
-                print(f"discover_movies: {time.perf_counter() - t0:.3f} sec")
-        else:
-            print("discover_movies: SKIPPED (recommendations + similar >= 10)")
 
         recs = [c for c in raw_candidates if c.get("_source") == "recommendation"]
         sims = [c for c in raw_candidates if c.get("_source") == "similar"]
         disc = [c for c in raw_candidates if c.get("_source") == "discover"]
-        print(f"Candidates by source: recommendations={len(recs)}, similar={len(sims)}, discover={len(disc)}")
-
-        print(f"Total raw candidates: {len(raw_candidates)}")
+        logger.debug("Candidates: recommendations=%d, similar=%d, discover=%d", len(recs), len(sims), len(disc))
         if not raw_candidates:
             return RecommendationResult(
                 success=False,
@@ -178,8 +151,6 @@ class RecommendationService:
             )
 
         details["keywords"] = self.tmdb.get_movie_keywords(source_id)
-        print(f"Source keywords ({movie.get('title', '?')}): {details.get('keywords', [])}")
-        print(f"Source keywords are EMPTY: {not details.get('keywords')}")
 
         details["director"] = ""
         details["cast"] = []
@@ -188,7 +159,7 @@ class RecommendationService:
             details["director"] = people.get("director", "")
             details["cast"] = people.get("cast", [])
         except Exception as e:
-            print(f"get_movie_people (source): FAILED {e}")
+            logger.warning("Failed to fetch people for source movie: %s", e)
 
         for c in raw_candidates:
             c["keywords"] = self.tmdb.get_movie_keywords(c["id"])
@@ -199,41 +170,15 @@ class RecommendationService:
                 c["director"] = people.get("director", "")
                 c["cast"] = people.get("cast", [])
             except Exception as e:
-                print(f"get_movie_people ({c.get('title', '?')}): FAILED {e}")
+                logger.warning("Failed to get_people for %s: %s", c.get("title", "?"), e)
 
         def _score_and_sort(group: list[dict], label: str) -> list[tuple[float, dict[str, float], dict]]:
             if not group:
                 return []
             result: list[tuple[float, dict[str, float], dict]] = []
-            print(f"\n--- {label} ---")
             for c in group:
                 components: dict[str, float] = {}
                 total = score_movie(details, c, breakdown=components)
-
-                c_kw = set(c.get("keywords", []))
-                s_kw = set(details.get("keywords", []))
-                overlap = s_kw & c_kw
-                kw_score = components.get("keywords", 0.0) if s_kw else 0.0
-                endpoint_bonus = components.get("endpoint_bonus", 0.0)
-
-                print(f"\n  {c.get('title', '?')}")
-                print(f"    _source = {c.get('_source', 'N/A')}")
-                print(f"    endpoint_bonus = {endpoint_bonus:.2f}")
-                print(f"    director match: {components.get('director', 0.0) > 0}")
-                shared = sorted(
-                    {n.strip().lower() for n in details.get("cast", []) if n and n.strip()}
-                    & {n.strip().lower() for n in c.get("cast", []) if n and n.strip()}
-                )
-                print(f"    shared actors: {shared}")
-                print(f"    cast score: {components.get('cast', 0.0):.2f}")
-                print(f"    source keywords ({len(s_kw)}): {sorted(s_kw)}")
-                print(f"    source keywords EMPTY: {not s_kw}")
-                print(f"    candidate keywords ({len(c_kw)}): {sorted(c_kw)}")
-                print(f"    candidate keywords EMPTY: {not c_kw}")
-                print(f"    keyword overlap: {sorted(overlap)}")
-                print(f"    keyword score: {kw_score:.2f}")
-                print(f"    overview score: {components.get('overview', 0.0):.2f}")
-
                 result.append((total, components, c))
             result.sort(key=lambda x: x[0], reverse=True)
             return result
@@ -248,15 +193,12 @@ class RecommendationService:
             reverse=True,
         )
         top10_candidates = [c for _, _, c in all_scored[:10]]
-        print("=== TOP-10 CANDIDATES ===")
-        for i, c in enumerate(top10_candidates, 1):
-            print(f"  {i}. {c.get('title', '?')} (score={all_scored[i-1][0]:.2f}, _source={c.get('_source', '?')})")
 
         ollama_titles: list[str] = []
         try:
             ollama_titles = self.ollama.rerank_movies(user_query, top10_candidates, source_movie=movie)
         except Exception as e:
-            print(f"Ollama rerank failed: {e}")
+            logger.warning("Ollama rerank failed: %s", e)
 
         title_to_movie: dict[str, dict] = {}
         for c in raw_candidates:
@@ -268,28 +210,23 @@ class RecommendationService:
         seen_ids: set[int] = set()
         ollama_used = False
 
-        print("=== OLLAMA TITLE MATCHING ===")
         for t in ollama_titles:
             t_clean = t.strip().lower()
             match = title_to_movie.get(t_clean)
-            if match:
-                print(f"  MATCHED: '{t}' -> {match.get('title', '?')} (id={match['id']})")
-            else:
-                print(f"  NOT FOUND: '{t}' — no match in candidates")
             if match and match["id"] not in seen_ids:
                 selected.append(match)
                 seen_ids.add(match["id"])
                 ollama_used = True
 
         if not ollama_used:
-            print("  -> Ollama returned 0 valid titles. Full fallback to MovieScorer.")
+            logger.info("Ollama returned 0 valid titles. Full fallback to MovieScorer.")
         elif len(selected) < 3:
-            print(f"  -> Ollama returned only {len(selected)} valid title(s). Filling rest from MovieScorer.")
+            logger.info("Ollama returned only %d valid titles. Filling rest from MovieScorer.", len(selected))
         else:
-            print(f"  -> Ollama returned {len(selected)} valid titles. Using Ollama selection.")
+            logger.info("Ollama returned %d valid titles. Using Ollama selection.", len(selected))
 
         if not ollama_used or len(selected) < 3:
-            print("Ollama selection incomplete — falling back to MovieScorer ranking")
+            logger.info("Ollama selection incomplete — falling back to MovieScorer ranking")
             selected = []
             seen_ids.clear()
 
@@ -348,19 +285,13 @@ class RecommendationService:
                 movies=[],
             )
 
-        t0 = time.perf_counter()
         person = self.tmdb.search_person(value)
-        print(f"search_person (ru): {time.perf_counter() - t0:.3f} sec")
         if not person:
             normalized = _normalize_name(value)
             if normalized:
-                t0 = time.perf_counter()
                 person = self.tmdb.search_person(normalized)
-                print(f"search_person normalized (ru): {time.perf_counter() - t0:.3f} sec ({normalized})")
             if not person:
-                t0 = time.perf_counter()
                 person = self.tmdb.search_person(value, language="en-US")
-                print(f"search_person (en): {time.perf_counter() - t0:.3f} sec")
             if not person:
                 return RecommendationResult(
                     success=False,
@@ -371,11 +302,9 @@ class RecommendationService:
         department = person.get("known_for_department", "")
         role: Literal["actor", "director"] = "director" if department == "Directing" else "actor"
         display_name = person["name"]
-        print(f"Person: {display_name}, role: {role}")
+        logger.info("Person: %s, role: %s", display_name, role)
 
-        t0 = time.perf_counter()
         movies = self.tmdb.get_person_movies(person["id"], role)
-        print(f"get_person_movies: {time.perf_counter() - t0:.3f} sec ({len(movies)} movies)")
 
         EXCLUDED_KEYWORDS = [
             "making", "behind", "featurette", "special", "interview",
@@ -470,7 +399,6 @@ class RecommendationService:
             (g["name"] for g in genres if g["id"] == genre_id), str(genre_id)
         )
 
-        t0 = time.perf_counter()
         seen_ids: set[int] = set()
         candidates: list[dict] = []
         for page in range(1, 6):
@@ -485,7 +413,6 @@ class RecommendationService:
                 if m["id"] not in seen_ids:
                     seen_ids.add(m["id"])
                     candidates.append(m)
-        print(f"discover_movies (genre): {time.perf_counter() - t0:.3f} sec ({len(candidates)} candidates)")
 
         if not candidates:
             return RecommendationResult(
@@ -541,16 +468,6 @@ class RecommendationService:
             fallback.sort(key=lambda m: (-(m.get("vote_average") or 0), -(m.get("vote_count") or 0)))
             fallback = _dedup_franchises(fallback)
             top.extend(fallback[:needed])
-
-        print("Genre candidates:", len(candidates))
-        print("After filters:", len(top))
-        print("Top 10:")
-        all_sorted = sorted(
-            with_overview + without_overview,
-            key=lambda m: (-(m.get("vote_average") or 0), -(m.get("vote_count") or 0)),
-        )
-        for movie in all_sorted[:10]:
-            print(movie["title"], movie["vote_average"], movie["vote_count"])
 
         text = f"🎬 Best '{genre_display}' movies:\n\n"
         for i, m in enumerate(top, 1):

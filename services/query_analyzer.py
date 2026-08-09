@@ -111,13 +111,11 @@ class QueryAnalyzer:
             and whether AI processing is needed.
         """
         cleaned = text.strip().lower()
-        print(f"INPUT: {text}")
 
         similar_with_prefix = SIMILAR_PATTERNS[0]
         match = similar_with_prefix[0].search(cleaned)
         if match:
             value = match.group(1).strip()
-            print(f"QueryType={QueryType.SIMILAR_MOVIE}, value={value}")
             return AnalysisResult(
                 query_type=QueryType.SIMILAR_MOVIE,
                 value=value,
@@ -126,7 +124,6 @@ class QueryAnalyzer:
 
         for genre_name in GENRE_KEYWORDS:
             if re.search(rf"\b{re.escape(genre_name)}\b", cleaned):
-                print(f"QueryType={QueryType.GENRE}, value={genre_name}")
                 return AnalysisResult(
                     query_type=QueryType.GENRE,
                     value=genre_name,
@@ -137,7 +134,6 @@ class QueryAnalyzer:
         if theme_match:
             theme = theme_match.group(1).strip()
             if theme in THEME_TO_GENRE:
-                print(f"QueryType={QueryType.GENRE}, value={theme}")
                 return AnalysisResult(
                     query_type=QueryType.GENRE,
                     value=theme,
@@ -148,14 +144,12 @@ class QueryAnalyzer:
             match = pattern.search(cleaned)
             if match:
                 value = match.group(1).strip()
-                print(f"QueryType={query_type}, value={value}")
                 return AnalysisResult(
                     query_type=query_type,
                     value=value,
                     needs_ai=False,
                 )
 
-        print(f"QueryType={QueryType.AI_REQUIRED}")
         return AnalysisResult(
             query_type=QueryType.AI_REQUIRED,
             value=cleaned,

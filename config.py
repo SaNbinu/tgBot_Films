@@ -11,5 +11,4 @@ for stream in (sys.stdout, sys.stderr):
         pass
 
 TOKEN = os.getenv("TOKEN")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID")
